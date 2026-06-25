@@ -24,6 +24,7 @@ import { DimensionAuditPanel } from './ui/dimension-audit.js';
 import { ComparativePanel } from './ui/comparative-panel.js';
 import { IngestionPanel } from './ui/ingestion-panel.js';
 import { ScientificReportPanel } from './ui/scientific-report.js';
+import { BenchmarkPanel } from './ui/benchmark-panel.js';
 
 // ══════════════════════════════════════════
 // DMSEParams helper — creates a params object
@@ -90,6 +91,11 @@ const ROUTES = {
         title: 'Análise Comparativa de Modelos',
         subtitle: 'Newton · MOND · ΛCDM (NFW) · Orange-DMS contra dados observacionais SPARC',
         render: renderCompare
+    },
+    benchmark: {
+        title: 'Benchmark Comparativo de Campo Escalar',
+        subtitle: 'Klein-Gordon · φ⁴ Theory · Worldsheet String · Orange-DMSE — mesmo grid, mesmas condições',
+        render: renderBenchmark
     },
     ingest: {
         title: 'Ingestão de Dados Externos',
@@ -415,6 +421,11 @@ function renderCompare(container) {
     });
 }
 
+function renderBenchmark(container) {
+    const panel = new BenchmarkPanel(container);
+    panel.render();
+}
+
 function renderIngest(container) {
     const panel = new IngestionPanel(container);
     panel.render();
@@ -632,8 +643,9 @@ function init() {
     const loading = document.getElementById('loading-screen');
     if (loading) loading.classList.add('hidden');
 
-    console.log('[Orange-DMSE] Plataforma v2.0 inicializada com sucesso.');
+    console.log('[Orange-DMSE] Plataforma v3.1 inicializada com sucesso.');
     console.log('[Orange-DMSE] Motor PDE: 30 canais, grid', AppState.params.grid, ', Verlet 2ª ordem');
+    console.log('[Orange-DMSE] Benchmark comparativo: Klein-Gordon · φ⁴ · String · Orange');
 }
 
 // Start when DOM is ready
