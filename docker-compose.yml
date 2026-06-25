@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    container_name: orange_dms_api
+    command: python -m uvicorn orange_api:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    restart: always
+
+  dashboard:
+    build: .
+    container_name: orange_dms_dashboard
+    command: python -m streamlit run orange_app.py --server.port 8501 --server.address 0.0.0.0
+    ports:
+      - "8501:8501"
+    depends_on:
+      - api
+    restart: always

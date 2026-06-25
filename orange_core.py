@@ -15,6 +15,10 @@ import numpy as np
 
 Array = np.ndarray
 
+# Constantes físicas do vácuo para consistência dimensional
+C_LIGHT = 299792458.0      # m/s
+Z0_VACUUM = 376.730313      # Ohms
+
 # ------------------------------
 # 1) Parâmetros e estados
 # ------------------------------
@@ -80,8 +84,12 @@ def laplacian2d(u: Array, dx: float, boundary: str) -> Array:
 # ------------------------------
 
 def residual_r(E: Array, omega_tilde: Array, E0: float) -> Array:
-    """r = ω̃ * Ẽ - 1  (Ẽ = E/E0)."""
-    return omega_tilde * (E / E0) - 1.0
+    """
+    r = (ω * Z0 * ε_-) / c + 1.0
+    Onde definimos ε_- = -E/E0 (resistência negativa), simplificando para:
+    r = (ω_tilde * Z0 * E / E0) / c - 1.0
+    """
+    return (omega_tilde * Z0_VACUUM * (E / E0)) / C_LIGHT - 1.0
 
 def nonlinear_attractor(E: Array, omega_tilde: Array, E0: float, kappa: float) -> Array:
     """(κ/E0) * ω̃ * r."""
@@ -213,7 +221,9 @@ class DMSEngine:
             E_init = rng.normal(0.0, scale, size=(C, H, W)).astype(np.float32)
 
         if omega_tilde is None:
-            omega_tilde = (1.0 + 0.01 * rng.normal(size=(C, H, W))).astype(np.float32)
+            # Frequência angular na escala física de c/Z0 (~7.95e5 rad/s)
+            omega_scale = C_LIGHT / Z0_VACUUM
+            omega_tilde = (omega_scale * (1.0 + 0.01 * rng.normal(size=(C, H, W)))).astype(np.float32)
 
         self.state = DMSEState(
             E=E_init.copy(),

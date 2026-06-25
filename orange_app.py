@@ -10,6 +10,7 @@ import os
 
 # Import do núcleo de simulação
 import orange_core as core
+import galaxy_models
 
 # Configurações de Página
 st.set_page_config(
@@ -178,9 +179,10 @@ p_active = core.DMSEParams(
 # -----------------------------
 # Abas Principais da Interface
 # -----------------------------
-tab_sim, tab_abl, tab_quantum, tab_theory = st.tabs([
+tab_sim, tab_abl, tab_astro, tab_quantum, tab_theory = st.tabs([
     "⚡ Simulação da Malha", 
     "📊 Ablação de Modelos", 
+    "🌌 Astrofísica (Ajuste SPARC)",
     "⚛️ Protótipo Quântico", 
     "📖 Fundamentação Teórica"
 ])
@@ -544,7 +546,124 @@ with tab_abl:
                     st.dataframe(pd.DataFrame(data_df), use_container_width=True)
 
 # --------------------------------------------------
-# TAB 3: Protótipo Quântico
+# TAB 3: Astrofísica (Ajuste SPARC)
+# --------------------------------------------------
+with tab_astro:
+    st.subheader("Ajuste de Curvas de Rotação Galáctica - Bancos de Dados SPARC")
+    st.markdown("""
+    O modelo **Orange - DMS** propõe que a aceleração gravitacional observada nas bordas de galáxias espirais 
+    não decorre de matéria escura oculta, mas sim da **energia de gradiente** da malha vetorial dimensional.
+    Abaixo, você pode selecionar galáxias do catálogo **SPARC** e interagir com o ajuste de curva em tempo real.
+    """)
+    
+    # Coleta valores ativos do motor da simulação (se existirem)
+    if st.session_state.engine and st.session_state.engine.state:
+        # Usa média e kappa da simulação para acoplamento dinâmico
+        sim_E_mean = float(np.mean(st.session_state.engine.state.E))
+        sim_kappa = float(st.session_state.engine.state.kappa)
+        st.info(f"✨ Conectado à Simulação Ativa: E_mean = {sim_E_mean:.4f} | κ = {sim_kappa:.4f}")
+    else:
+        sim_E_mean = 1.0
+        sim_kappa = 1.0
+        st.warning("⚠️ Nenhuma simulação ativa na Aba 1. Usando coeficientes base de acoplamento da malha: E_mean = 1.0 | κ = 1.0")
+
+    col_ast_ctrl, col_ast_chart = st.columns([1, 2])
+    
+    with col_ast_ctrl:
+        st.markdown("**Configurações de Ajuste**")
+        gal_sel = st.selectbox("Selecione a Galáxia SPARC", list(galaxy_models.GALAXY_DATA.keys()))
+        gal_info = galaxy_models.GALAXY_DATA[gal_sel]
+        
+        st.markdown(f"*{gal_info['description']}*")
+        st.markdown("---")
+        
+        # Sliders do modelo Orange - DMS
+        gamma_fit = st.slider("Constante de Acoplamento (γ)", 0.0, 10.0, 1.5, 0.1)
+        r_scale_fit = st.slider("Raio de Escala da Malha (Rs) [kpc]", 1.0, 30.0, 8.0, 0.5)
+        beta_fit = st.slider("Exponente de Decaimento (β)", 0.5, 3.0, 1.0, 0.1)
+        
+    with col_ast_chart:
+        # Preparação dos dados e curvas
+        R = gal_info["R"]
+        V_obs = gal_info["Vobs"]
+        V_obs_err = gal_info["Vobs_err"]
+        
+        # Newton
+        v_newt = galaxy_models.velocity_newtonian(gal_info["Vdisk"], gal_info["Vbulge"], gal_info["Vgas"])
+        
+        # MOND
+        v_mond = galaxy_models.velocity_mond(v_newt, R)
+        
+        # Orange - DMS
+        v_dms = galaxy_models.velocity_orange_dms(
+            v_newt, R, 
+            gamma=gamma_fit, R_s=r_scale_fit, beta=beta_fit,
+            E_mean=sim_E_mean, kappa=sim_kappa
+        )
+        
+        # Cálculo de Chi2
+        chi2_n, chi2_nr = galaxy_models.compute_chi2(V_obs, V_obs_err, v_newt, 0)
+        chi2_m, chi2_mr = galaxy_models.compute_chi2(V_obs, V_obs_err, v_mond, 1)
+        chi2_d, chi2_dr = galaxy_models.compute_chi2(V_obs, V_obs_err, v_dms, 3)
+        
+        # Visualização de Qui-quadrado
+        col_c1, col_c2, col_c3 = st.columns(3)
+        with col_c1:
+            st.metric("Newton Red χ²", f"{chi2_nr:.2f}", delta="Incompleto", delta_color="inverse")
+        with col_c2:
+            st.metric("MOND Red χ²", f"{chi2_mr:.2f}", delta="Ajustado")
+        with col_c3:
+            st.metric("Orange-DMS Red χ²", f"{chi2_dr:.2f}", delta="Ajustado" if chi2_dr < chi2_nr else "Ajustar", delta_color="normal" if chi2_dr < 3.0 else "off")
+            
+        # Plot das Curvas
+        fig_curves = go.Figure()
+        
+        # Pontos observados (SPARC)
+        fig_curves.add_trace(go.Scatter(
+            x=R, y=V_obs,
+            error_y=dict(type='data', array=V_obs_err, visible=True),
+            mode='markers',
+            name='Dados SPARC (Obs)',
+            marker=dict(color='#FFFFFF', size=7, symbol='circle-open-dot')
+        ))
+        
+        # Newton
+        fig_curves.add_trace(go.Scatter(
+            x=R, y=v_newt,
+            mode='lines',
+            name='Gravidade Newtoniana',
+            line=dict(color='#EF5350', dash='dash')
+        ))
+        
+        # MOND
+        fig_curves.add_trace(go.Scatter(
+            x=R, y=v_mond,
+            mode='lines',
+            name='MOND',
+            line=dict(color='#26A69A', dash='dot')
+        ))
+        
+        # Orange - DMS
+        fig_curves.add_trace(go.Scatter(
+            x=R, y=v_dms,
+            mode='lines+markers',
+            name='Orange - DMS (Malha Vetorial)',
+            line=dict(color='#FF5E00', width=3)
+        ))
+        
+        fig_curves.update_layout(
+            title=f"Curva de Rotação de Galáxia - {gal_sel}",
+            xaxis_title="Raio R (kpc)",
+            yaxis_title="Velocidade de Rotação V (km/s)",
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(15,20,30,0.4)',
+            height=400,
+            margin=dict(l=40, r=20, b=40, t=40)
+        )
+        st.plotly_chart(fig_curves, use_container_width=True)
+
+# --------------------------------------------------
+# TAB 4: Protótipo Quântico
 # --------------------------------------------------
 with tab_quantum:
     st.subheader("Codificação de Amplitude e Kernel Quântico")
@@ -648,7 +767,8 @@ with tab_theory:
     
     ### 3. A Dinâmica PDE do Sistema
     A evolução de campo eletrodinâmico é modelada pela equação diferencial parcial hiperbólica amortecida por canal $c$:
-    $$\rho \frac{\partial^2 E_c}{\partial t^2} + \eta \frac{\partial E_c}{\partial t} - \alpha \nabla^2 E_c + \frac{\kappa_c}{E_0} \omega_c \left( \omega_c \frac{E_c}{E_0} - 1 \right) + \text{Coupling}(E_c) = 0$$
+    $$\rho \frac{\partial^2 E_c}{\partial t^2} + \eta \frac{\partial E_c}{\partial t} - \alpha \nabla^2 E_c + \frac{\kappa_c}{E_0} \omega_c \left( \frac{\omega_c Z_0 E_c}{c E_0} - 1 \right) + \text{Coupling}(E_c) = 0$$
     Onde:
+    - $Z_0 \approx 376.73\ \Omega$ e $c = 299792458\ m/s$ são constantes universais de consistência de unidades do vácuo.
     - $\kappa_c$ é o coeficiente de acoplamento não-linear adaptado dinamicamente para minimizar a divergência local em relação ao vácuo ($r_{rms}$).
     """)
