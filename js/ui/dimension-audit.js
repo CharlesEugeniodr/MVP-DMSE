@@ -13,7 +13,9 @@ const STATUS = {
   PROVEN:        { emoji: '🟢', label: 'PROVEN',        color: '#66BB6A', cls: 'status-pass' },
   SATURATED:     { emoji: '🟡', label: 'SATURATED',     color: '#FFA726', cls: 'status-warning' },
   FALLIBLE:      { emoji: '🔴', label: 'FALLIBLE',      color: '#EF5350', cls: 'status-fail' },
-  INDETERMINATE: { emoji: '⚪', label: 'INDETERMINATE', color: '#718096', cls: 'status-indeterminate' }
+  INDETERMINATE: { emoji: '⚪', label: 'INDETERMINATE', color: '#718096', cls: 'status-indeterminate' },
+  ANOMALOUS:     { emoji: '🚫', label: 'ANOMALOUS',     color: '#E040FB', cls: 'status-anomalous' },
+  STATIC:        { emoji: '⚫', label: 'STATIC',        color: '#455A64', cls: 'status-static' },
 };
 
 const COLUMNS = [
@@ -84,7 +86,7 @@ export class DimensionAuditPanel {
       tr.appendChild(tdNum);
 
       // Criterion cells
-      const overall = { PROVEN: 0, SATURATED: 0, FALLIBLE: 0, INDETERMINATE: 0 };
+      const overall = { PROVEN: 0, SATURATED: 0, FALLIBLE: 0, INDETERMINATE: 0, ANOMALOUS: 0, STATIC: 0 };
       COLUMNS.forEach(col => {
         const key = dim[col] || 'INDETERMINATE';
         overall[key]++;
@@ -173,6 +175,8 @@ export class DimensionAuditPanel {
   }
 
   _deriveOverall(counts) {
+    if (counts.ANOMALOUS > 0) return 'ANOMALOUS';
+    if (counts.STATIC > 0 && (counts.PROVEN || 0) === 0) return 'STATIC';
     if (counts.FALLIBLE > 0) return 'FALLIBLE';
     if (counts.INDETERMINATE >= 3) return 'INDETERMINATE';
     if (counts.SATURATED >= 2) return 'SATURATED';

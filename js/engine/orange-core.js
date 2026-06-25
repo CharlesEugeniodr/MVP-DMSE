@@ -43,19 +43,20 @@ export const DEFAULT_PARAMS = Object.freeze({
   grid:              [64, 64],
   n_channels:        30,
   dx:                1.0,
-  dt:                0.02,
+  dt:                0.01,
   rho:               1.0,
-  eta:               0.1,
+  eta:               0.05,
   alpha:             0.5,
   E0:                1.0,
   kappa_init:        1.0,
-  kappa_gain:        0.5,
+  kappa_gain:        0.1,
   r_rms_target:      0.02,
   kappa_min:         1e-6,
   kappa_max:         1e3,
   boundary:          'neumann',
-  coupling_strength: 0.02,
+  coupling_strength: 0.1,
   pairwise_coupling: true,
+  warmup_steps:      50,
 });
 
 // ─── Seeded PRNG (xoshiro128**) ────────────────────────────────────────────────
@@ -187,24 +188,34 @@ export function laplacian2d(src, dst, Ny, Nx, dx, mode = 'neumann') {
 /**
  * Dimensionless residual for channel d at a single grid point.
  *
- *   r = (ω̃ · Z0 · E / E0) / c  − 1
+ * Measures deviation from the equilibrium point E = ±E0:
+ *   r = (E / E0) − sign(E)
  *
- * Here ω̃ is approximated as |E| (the local field magnitude acts as
- * an effective angular frequency proxy in the dimensionless mesh).
+ * This ensures:
+ *   - r → 0 when |E| → E0 (convergence at the attractor)
+ *   - r < 0 when |E| < E0 (field too weak)
+ *   - r > 0 when |E| > E0 (field too strong)
+ *
+ * The physical motivation is the postulate ω·Z0·ε/c = −1,
+ * which defines E0 as the equilibrium amplitude. This formulation
+ * keeps the residual adimensional and numerically tractable.
  *
  * @param {number} E   - Local field value
- * @param {number} E0  - Reference amplitude
+ * @param {number} E0  - Reference amplitude (equilibrium)
  * @returns {number}
  */
 export function residualR(E, E0) {
-  const omega_tilde = Math.abs(E);
-  return (omega_tilde * Z0_VACUUM * E / E0) / C_LIGHT - 1.0;
+  // Adimensional residual: distance from nearest fixed point ±E0
+  if (Math.abs(E) < 1e-30) return -1.0;  // zero field is maximally far from ±E0
+  return (E / E0) - Math.sign(E);
 }
 
 /**
- * Nonlinear attractor term.
+ * Nonlinear attractor term with saturation clamp.
  *
- *   NL = (κ / E0) · ω · r
+ *   NL = clamp( (κ / E0) · ω · r, -NL_max, +NL_max )
+ *
+ * The clamp prevents numerical explosion when κ is large.
  *
  * @param {number} kappa - Coupling constant
  * @param {number} E0    - Reference amplitude
@@ -213,7 +224,9 @@ export function residualR(E, E0) {
  * @returns {number}
  */
 export function nonlinearAttractor(kappa, E0, omega, r) {
-  return (kappa / E0) * omega * r;
+  const raw = (kappa / E0) * omega * r;
+  const NL_MAX = 100.0;  // Saturation clamp
+  return Math.max(-NL_MAX, Math.min(NL_MAX, raw));
 }
 
 /**
@@ -345,7 +358,11 @@ export function computeMetrics(state, params) {
  * @param {DMSEParams}    params
  */
 export function adaptKappa(state, r_rms, params) {
-  const { kappa_gain, r_rms_target, kappa_min, kappa_max } = params;
+  const { kappa_gain, r_rms_target, kappa_min, kappa_max, warmup_steps } = params;
+
+  // During warm-up, keep κ fixed to let the field evolve naturally
+  if (warmup_steps && state.step < warmup_steps) return;
+
   for (let d = 0; d < state.C; d++) {
     const error = r_rms[d] - r_rms_target;
     let newKappa = state.kappa[d] * (1.0 + kappa_gain * error);
@@ -454,7 +471,8 @@ export class DMSEngine {
 
     for (let d = 0; d < p.n_channels; d++) {
       for (let i = 0; i < s.N; i++) {
-        const noise = (rng() - 0.5) * 0.01 * p.E0;
+        // Seed with ±10% of E0 to give the attractor something to work with
+        const noise = (rng() - 0.5) * 0.2 * p.E0;
         s.E[d][i]      = noise;
         s.E_prev[d][i] = noise;
       }

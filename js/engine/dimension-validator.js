@@ -31,6 +31,8 @@ export const DimensionStatus = Object.freeze({
   SATURATED:     'SATURATED',
   FALLIBLE:      'FALLIBLE',
   INDETERMINATE: 'INDETERMINATE',
+  ANOMALOUS:     'ANOMALOUS',
+  STATIC:        'STATIC',
 });
 
 // ─── Thresholds ────────────────────────────────────────────────────────────────
@@ -54,6 +56,12 @@ const THRESHOLDS = Object.freeze({
 
   /** Test 6 – Cross-falsifiability: max allowed fraction of other dims whose status flips */
   crossFalsifiabilityMaxFlip: 0.5,
+
+  /** STATIC detection: max E_kin ever observed */
+  staticEkinThreshold: 1e-10,
+
+  /** ANOMALOUS detection: CV of r_rms exceeding this indicates chaotic behavior */
+  anomalousCVThreshold: 0.5,
 });
 
 // ─── DimensionResult ───────────────────────────────────────────────────────────
@@ -143,7 +151,7 @@ export class DimensionValidator {
    * @param {number}     [steps=200] - Number of simulation steps to run
    * @returns {DimensionResult[]} Array of 30 results
    */
-  validateAll(engine, params, steps = 200) {
+  validateAll(engine, params, steps = 1000) {
     // ── Phase 1: Run the baseline simulation ────────────────────────────
     engine.reset(42);
     let baseMetrics;
@@ -281,11 +289,21 @@ export class DimensionValidator {
           : `Saturating dim ${d} flips too many dims (${flippedCount})`,
       });
 
-      // ── Classify ──────────────────────────────────────────────────
+      // ── Classify ──────────────────────────────────────────────────────────
       const passCount = tests.filter(t => t.passed).length;
       let status;
 
-      if (passCount === 6) {
+      // Priority 1: STATIC detection — dimension never evolved
+      const eKinMax = Math.max(...eKinHist, 0);
+      if (eKinMax < this.thresholds.staticEkinThreshold) {
+        status = DimensionStatus.STATIC;
+      }
+      // Priority 2: ANOMALOUS detection — chaotic oscillation or κ extremes
+      else if (cv > this.thresholds.anomalousCVThreshold) {
+        status = DimensionStatus.ANOMALOUS;
+      }
+      // Priority 3: Standard classification
+      else if (passCount === 6) {
         status = DimensionStatus.PROVEN;
       } else if (convPass && !satPass && stabPass) {
         status = DimensionStatus.SATURATED;
