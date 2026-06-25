@@ -9,19 +9,7 @@
  * @module ui/benchmark-panel
  */
 
-/* ── Try importing external modules; fall back to built-in runner ── */
-let BenchmarkRunner = null;
-let MODEL_INFO = null;
-
-try {
-  const runnerMod = await import('../engine/benchmark-runner.js');
-  BenchmarkRunner = runnerMod.BenchmarkRunner;
-} catch (_) { /* will use built-in runner */ }
-
-try {
-  const modelsMod = await import('../engine/field-models.js');
-  MODEL_INFO = modelsMod.MODEL_INFO;
-} catch (_) { /* will use built-in model info */ }
+/* ── Self-contained panel — no external engine dependencies ── */
 
 // ─── Consistent model definitions (always use these internal keys) ────────────
 const MODELS = {
@@ -410,31 +398,7 @@ export class BenchmarkPanel {
     }
   }
 
-  /**
-   * Adapt external BenchmarkRunner report to the internal results format
-   * expected by _showResults().
-   */
-  _adaptExternalReport(report) {
-    const results = {};
-    // Map external MODEL_INFO keys → internal MODELS keys
-    for (const intKey of MODEL_KEYS) {
-      const extId = MODELS[intKey].extId;
-      const m = report.models[extId];
-      if (!m) continue;
-      results[intKey] = {
-        r_rms_history: m.r_rms_history?.map(h => h.r_rms_global) || [],
-        r_rms_final: m.final_r_rms,
-        stableDims: m.stable_dims,
-        dimConverged: Array.from(m.final_r_rms_per_channel || [], v => v <= (report.params?.r_rms_target * 2 || 0.1)),
-        H_drift: m.H_drift,
-        globalCoherence: m.coherence?.globalCoherence || 0,
-        omegaEpsilonProduct: m.coherence?.postulate?.product || 0,
-        entropy: m.entropy,
-        t_estab: m.convergence_step >= 0 ? m.convergence_step : 1000,
-      };
-    }
-    return results;
-  }
+
 
   /* ─── Show Results ─── */
   _showResults(results) {
