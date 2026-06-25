@@ -57,6 +57,11 @@ export const DEFAULT_PARAMS = Object.freeze({
   coupling_strength: 0.1,
   pairwise_coupling: true,
   warmup_steps:      50,
+
+  // ── Thermal modulation (from the book, line 956) ────────────────────────────
+  // Θ(T) = 1 + α·ΔT — angular expansion coefficient
+  // Simulates the thermal gradient across octagonal cells
+  thermal_alpha:     0.05,
 });
 
 // ─── Seeded PRNG (xoshiro128**) ────────────────────────────────────────────────
@@ -267,7 +272,7 @@ export function crossChannelCoupling(E_d, E_pair, strength, out) {
  * @param {DMSEParams}   p       - Simulation parameters
  * @returns {Float32Array} E_next (new Float32Array)
  */
-export function pdeStep(E, E_prev, E_lap, coupling, kappa, p) {
+export function pdeStep(E, E_prev, E_lap, coupling, kappa, p, channelIdx = 0) {
   const N     = E.length;
   const dt    = p.dt;
   const dt2   = dt * dt;
@@ -276,6 +281,19 @@ export function pdeStep(E, E_prev, E_lap, coupling, kappa, p) {
   const alpha = p.alpha;
   const E0    = p.E0;
   const invRhoDt2 = dt2 / rho;
+
+  // ── Thermal modulation Θ(T) = 1 + α·ΔT (book, line 956) ──────────
+  // Each channel has a thermal gradient based on its position in the
+  // octagonal mesh. Conjugate pairs (d, C-1-d) receive symmetric ΔT.
+  const thermalAlpha = p.thermal_alpha || 0;
+  const C = p.n_channels || 30;
+  // Normalized position: 0 at center, ±1 at extremes
+  const normalizedPos = (2 * channelIdx - (C - 1)) / (C - 1);
+  // ΔT varies sinusoidally across the mesh (simulates octagonal gomo structure)
+  const deltaT = Math.sin(normalizedPos * Math.PI);
+  const thetaT = 1.0 + thermalAlpha * deltaT;
+  // Effective E0 modulated by thermal expansion
+  const E0_eff = E0 * thetaT;
 
   const E_next = new Float32Array(N);
 
@@ -286,13 +304,13 @@ export function pdeStep(E, E_prev, E_lap, coupling, kappa, p) {
     // Velocity estimate (backward difference)
     const ePrime = (e - e_prev) / dt;
 
-    // Residual & nonlinear attractor
-    const r     = residualR(e, E0);
+    // Residual & nonlinear attractor — uses thermally-modulated E0
+    const r     = residualR(e, E0_eff);
     // omega floor: prevents attractor from vanishing at E≈0
     // "O ser é vibração que resistiu ao colapso" — the attractor
     // must remain active even when the field is weak
-    const omega = Math.max(Math.abs(e), 0.1 * E0);
-    const nl    = nonlinearAttractor(kappa, E0, omega, r);
+    const omega = Math.max(Math.abs(e), 0.1 * E0_eff);
+    const nl    = nonlinearAttractor(kappa, E0_eff, omega, r);
 
     // Diffusion
     const diffusion = -alpha * E_lap[i];
@@ -520,7 +538,7 @@ export class DMSEngine {
         couplingBuf.fill(0);
       }
 
-      E_next[d] = pdeStep(s.E[d], s.E_prev[d], s.E_lap[d], couplingBuf, s.kappa[d], p);
+      E_next[d] = pdeStep(s.E[d], s.E_prev[d], s.E_lap[d], couplingBuf, s.kappa[d], p, d);
     }
 
     // 4. Rotate buffers

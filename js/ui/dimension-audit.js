@@ -8,6 +8,15 @@
 
 import { ChartManager } from './charts.js';
 
+// Import ontological data from the book
+let ONTOLOGY = [];
+try {
+  const mod = await import('../data/ontology-data.js');
+  ONTOLOGY = mod.DIMENSIONS_ONTOLOGY || [];
+} catch (_) {
+  // Fallback: ontology data not yet available
+}
+
 /* ── Status definitions ── */
 const STATUS = {
   PROVEN:        { emoji: '🟢', label: 'PROVEN',        color: '#66BB6A', cls: 'status-pass' },
@@ -39,8 +48,8 @@ export class DimensionAuditPanel {
     // ── Title
     const header = _el('div', 'audit-header');
     header.innerHTML = `
-      <h2 class="section-title">Dimensional Audit — 30D Validation Matrix</h2>
-      <p class="section-subtitle">${dims.length} dimensions evaluated across ${COLUMNS.length} criteria</p>
+      <h2 class="section-title">Auditoria Dimensional — Malha Octagonal Vetorial</h2>
+      <p class="section-subtitle">${dims.length} dimensões avaliadas · 7 tipos funcionais · 3 faixas operacionais</p>
     `;
     this.root.appendChild(header);
 
@@ -66,7 +75,7 @@ export class DimensionAuditPanel {
     // thead
     const thead = document.createElement('thead');
     const hRow  = document.createElement('tr');
-    ['Dim', ...COLUMNS, 'Overall'].forEach(c => {
+    ['Dim', 'Nome', 'Tipo', ...COLUMNS, 'Overall'].forEach(c => {
       const th = document.createElement('th'); th.textContent = c; hRow.appendChild(th);
     });
     thead.appendChild(hRow);
@@ -80,10 +89,24 @@ export class DimensionAuditPanel {
       tr.dataset.dim = idx;
 
       // Dim #
+      const onto = ONTOLOGY[idx] || {};
       const tdNum = document.createElement('td');
       tdNum.textContent = `D${idx + 1}`;
       tdNum.className = 'dim-num';
       tr.appendChild(tdNum);
+
+      // Dimension name (from the book)
+      const tdName = document.createElement('td');
+      tdName.textContent = onto.name || `Dimensão ${idx + 1}`;
+      tdName.className = 'dim-name';
+      tdName.title = onto.description || '';
+      tr.appendChild(tdName);
+
+      // Dimension type (color-coded from the book's 7 types)
+      const tdType = document.createElement('td');
+      const bandIcon = idx < 10 ? '🟢' : (idx < 20 ? '🟡' : '🔵');
+      tdType.innerHTML = `<span class="dim-type-badge" style="background:${onto.color || '#666'};color:#fff;padding:2px 8px;border-radius:4px;font-size:0.75rem">${bandIcon} ${onto.typeName || '—'}</span>`;
+      tr.appendChild(tdType);
 
       // Criterion cells
       const overall = { PROVEN: 0, SATURATED: 0, FALLIBLE: 0, INDETERMINATE: 0, ANOMALOUS: 0, STATIC: 0 };
@@ -129,10 +152,13 @@ export class DimensionAuditPanel {
     const detailTr = document.createElement('tr');
     detailTr.className = 'audit-detail-row';
     const td = document.createElement('td');
-    td.colSpan = COLUMNS.length + 2;
+    td.colSpan = COLUMNS.length + 4;
+    const onto = ONTOLOGY[idx] || {};
     td.innerHTML = `
       <div class="audit-detail-card hud-card">
-        <h4>Dimension ${idx + 1} — Detailed Analysis</h4>
+        <h4>${onto.icon || '🔷'} Dimensão ${idx + 1} — ${onto.name || 'Análise Detalhada'}</h4>
+        ${onto.description ? `<p style="color:var(--text-secondary);margin:4px 0 8px;font-style:italic">${onto.description}</p>` : ''}
+        ${onto.application ? `<p style="color:var(--text-secondary);margin:0 0 12px"><strong>Aplicação:</strong> ${onto.application}</p>` : ''}
         <ul style="list-style:none;padding:0;margin:8px 0">
           ${COLUMNS.map(col => {
             const key = dim[col] || 'INDETERMINATE';

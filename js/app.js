@@ -8,6 +8,7 @@ import { DEFAULT_PARAMS, DMSEngine, computeHamiltonianEnergy } from './engine/or
 import { SPARC_CATALOG } from './data/sparc-catalog.js';
 import { DimensionValidator } from './engine/dimension-validator.js';
 import { quickCalibrate } from './engine/calibrator.js';
+import { CoherenceAnalyzer } from './engine/coherence.js';
 import * as Metrics from './engine/metrics.js';
 import * as ComparativeModels from './engine/comparative-models.js';
 import { DataIngestion } from './data/data-ingestion.js';
@@ -50,7 +51,10 @@ const AppState = {
     // Comparative params
     orangeParams: { gamma: 1.5, Rs: 8.0, beta: 1.0 },
     selectedGalaxy: 'NGC_3198',
-    gammaPerGalaxy: { NGC_3198: 1.5, NGC_2403: 1.3, UGC_128: 4.8 }
+    gammaPerGalaxy: { NGC_3198: 1.5, NGC_2403: 1.3, UGC_128: 4.8 },
+
+    // Coherence analysis (Invisible Code)
+    coherenceReport: null,
 };
 
 // Expose to global for component access
@@ -66,6 +70,7 @@ window.DimensionValidator = DimensionValidator;
 window.DataIngestion = DataIngestion;
 window.getApophisComparison = getApophisComparison;
 window.ChartManager = ChartManager;
+window.CoherenceAnalyzer = CoherenceAnalyzer;
 
 // ══════════════════════════════════════════
 // Route Definitions
@@ -232,6 +237,14 @@ async function runSimulation(steps, onProgress) {
     }
 
     AppState.simulationRunning = false;
+    
+    // Final coherence analysis (Invisible Code theorem)
+    if (AppState.engine && AppState.engine.state) {
+        AppState.coherenceReport = CoherenceAnalyzer.analyze(
+            AppState.engine.state, AppState.params
+        );
+    }
+    
     updateEngineStatus('idle', `Motor: ${AppState.simulationSteps} passos`);
 }
 

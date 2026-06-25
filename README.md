@@ -134,6 +134,21 @@ python galaxy_models.py      # Ajuste SPARC
 
 ---
 
+## 📚 Base Teórica
+
+Documentação formal da fundamentação teórica da Teoria da Malha Octagonal Vetorial, extraída do livro *A Laranja do Eugênio: A Descoberta das Dimensões Ocultas*.
+
+### 📄 Documentos
+
+| Documento | Descrição |
+|-----------|-----------|
+| [**Postulado Fundamental**](docs/teoria/postulado_fundamental.md) | O postulado $\omega \cdot \varepsilon_{-} = -1$ — base de toda a teoria. Define a condição de estabilidade vetorial onde a frequência angular e a resistência dimensional se equilibram. Inclui o mapeamento para a simulação ($r = E/E_0 - \text{sign}(E) \to 0$). |
+| [**Classificação Dimensional**](docs/teoria/classificacao_dimensional.md) | As 30 dimensões emergentes organizadas em 3 faixas (Fundamental D1–10, Intermediária D11–20, Elevada D21–30) e 7 tipos funcionais: Reforço Espacial (6), Reversão Temporal (4), Polaridade Energética (5), Convergência Vetorial (6), Transição Frequencial (3), Densidade Cristalizada (4), Estabilização do Vácuo (2). |
+| [**Código Invisível**](docs/teoria/codigo_invisivel.md) | O teorema unificador: $C(x,y,z,t) = \Sigma(\vec{M}'_{ijk} \cdot \Theta(T)) \cdot \varepsilon_n \Rightarrow \omega \cdot \varepsilon_{-} = -1$. Sintetiza estrutura, estabilidade e emergência dimensional em uma única expressão. |
+| [**Comparativo de Modelos**](docs/teoria/comparativo_modelos.md) | Tabela comparativa entre a Malha Octagonal e Relatividade, Kaluza-Klein, Teoria das Cordas e Teoria M — avaliando estrutura dimensional, geometria, empiricidade, validação experimental, papel do vácuo e origem da matéria. |
+
+---
+
 ## 📜 Compromisso Científico e Ético
 
 > *"Amicus Plato, sed magis amica veritas."*

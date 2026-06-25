@@ -35,6 +35,82 @@ export const DimensionStatus = Object.freeze({
   STATIC:        'STATIC',
 });
 
+// ─── Dimension Types (from the book's 7 functional types) ──────────────────────
+//
+// Reference: "A Laranja do Eugênio", lines 1869–1875
+//   6 de reforço espacial, 4 de reversão temporal, 5 de polaridade energética,
+//   6 de convergência vetorial, 3 de transição frequencial,
+//   4 de densidade cristalizada, 2 de estabilização do vácuo
+
+/** @enum {string} */
+export const DimensionType = Object.freeze({
+  SPATIAL_REINFORCEMENT: 'SPATIAL_REINFORCEMENT',
+  TEMPORAL_REVERSAL:     'TEMPORAL_REVERSAL',
+  ENERGY_POLARITY:       'ENERGY_POLARITY',
+  VECTOR_CONVERGENCE:    'VECTOR_CONVERGENCE',
+  FREQUENCY_TRANSITION:  'FREQUENCY_TRANSITION',
+  CRYSTALLIZED_DENSITY:  'CRYSTALLIZED_DENSITY',
+  VACUUM_STABILIZATION:  'VACUUM_STABILIZATION',
+});
+
+/**
+ * Type assignment per channel (0-indexed).
+ * Convergence thresholds are differentiated:
+ *  - Spatial Reinforcement: strict (×1.0) — must converge precisely
+ *  - Temporal Reversal: moderate (×1.5) — phase-inverted oscillation
+ *  - Energy Polarity: moderate (×1.5) — symmetric opposing vectors
+ *  - Vector Convergence: standard (×1.5) — reflective, nucleus-directed
+ *  - Frequency Transition: relaxed (×2.5) — inherently oscillatory
+ *  - Crystallized Density: strict (×1.0) — εn = −1, maximum stability
+ *  - Vacuum Stabilization: moderate (×1.5) — neutral stabilizers
+ */
+export const DIMENSION_TYPE_MAP = Object.freeze([
+  /* d0  */ DimensionType.SPATIAL_REINFORCEMENT,
+  /* d1  */ DimensionType.SPATIAL_REINFORCEMENT,
+  /* d2  */ DimensionType.SPATIAL_REINFORCEMENT,
+  /* d3  */ DimensionType.SPATIAL_REINFORCEMENT,
+  /* d4  */ DimensionType.SPATIAL_REINFORCEMENT,
+  /* d5  */ DimensionType.SPATIAL_REINFORCEMENT,
+  /* d6  */ DimensionType.TEMPORAL_REVERSAL,
+  /* d7  */ DimensionType.TEMPORAL_REVERSAL,
+  /* d8  */ DimensionType.TEMPORAL_REVERSAL,
+  /* d9  */ DimensionType.TEMPORAL_REVERSAL,
+  /* d10 */ DimensionType.ENERGY_POLARITY,
+  /* d11 */ DimensionType.ENERGY_POLARITY,
+  /* d12 */ DimensionType.ENERGY_POLARITY,
+  /* d13 */ DimensionType.ENERGY_POLARITY,
+  /* d14 */ DimensionType.ENERGY_POLARITY,
+  /* d15 */ DimensionType.VECTOR_CONVERGENCE,
+  /* d16 */ DimensionType.VECTOR_CONVERGENCE,
+  /* d17 */ DimensionType.VECTOR_CONVERGENCE,
+  /* d18 */ DimensionType.VECTOR_CONVERGENCE,
+  /* d19 */ DimensionType.VECTOR_CONVERGENCE,
+  /* d20 */ DimensionType.VECTOR_CONVERGENCE,
+  /* d21 */ DimensionType.FREQUENCY_TRANSITION,
+  /* d22 */ DimensionType.FREQUENCY_TRANSITION,
+  /* d23 */ DimensionType.FREQUENCY_TRANSITION,
+  /* d24 */ DimensionType.CRYSTALLIZED_DENSITY,
+  /* d25 */ DimensionType.CRYSTALLIZED_DENSITY,
+  /* d26 */ DimensionType.CRYSTALLIZED_DENSITY,
+  /* d27 */ DimensionType.CRYSTALLIZED_DENSITY,
+  /* d28 */ DimensionType.VACUUM_STABILIZATION,
+  /* d29 */ DimensionType.VACUUM_STABILIZATION,
+]);
+
+/**
+ * Convergence factor multiplier per type.
+ * Applied to r_rms_target to get the actual threshold.
+ */
+const TYPE_CONVERGENCE_FACTOR = Object.freeze({
+  [DimensionType.SPATIAL_REINFORCEMENT]: 1.0,
+  [DimensionType.TEMPORAL_REVERSAL]:     1.5,
+  [DimensionType.ENERGY_POLARITY]:       1.5,
+  [DimensionType.VECTOR_CONVERGENCE]:    1.5,
+  [DimensionType.FREQUENCY_TRANSITION]:  2.5,
+  [DimensionType.CRYSTALLIZED_DENSITY]:  1.0,
+  [DimensionType.VACUUM_STABILIZATION]:  1.5,
+});
+
 // ─── Thresholds ────────────────────────────────────────────────────────────────
 
 /** @type {Object} Default thresholds used by the six tests. */
@@ -168,8 +244,11 @@ export class DimensionValidator {
       const tests = [];
 
       // ─ Test 1: Convergence ─────────────────────────────────────────
+      // Use type-specific convergence factor from the book's 7 functional types
+      const dimType = d < DIMENSION_TYPE_MAP.length ? DIMENSION_TYPE_MAP[d] : DimensionType.SPATIAL_REINFORCEMENT;
+      const typeFactor = TYPE_CONVERGENCE_FACTOR[dimType] || this.thresholds.convergenceFactor;
       const rRms     = baseMetrics.r_rms[d];
-      const convThresh = params.r_rms_target * this.thresholds.convergenceFactor;
+      const convThresh = params.r_rms_target * typeFactor;
       const convPass = rRms <= convThresh;
       tests.push({
         name:      'convergence',
@@ -313,9 +392,14 @@ export class DimensionValidator {
         status = DimensionStatus.INDETERMINATE;
       }
 
+      // Determine dimensional band
+      const band = d < 10 ? 'FUNDAMENTAL' : (d < 20 ? 'INTERMEDIATE' : 'ELEVATED');
+
       results.push({
         dimension: d,
         status,
+        type: dimType,
+        band,
         tests,
         r_rms:  rRms,
         kappa:  state.kappa[d],
