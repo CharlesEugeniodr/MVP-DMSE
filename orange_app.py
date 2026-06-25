@@ -179,10 +179,11 @@ p_active = core.DMSEParams(
 # -----------------------------
 # Abas Principais da Interface
 # -----------------------------
-tab_sim, tab_abl, tab_astro, tab_quantum, tab_theory = st.tabs([
+tab_sim, tab_abl, tab_astro, tab_laudo, tab_quantum, tab_theory = st.tabs([
     "⚡ Simulação da Malha", 
     "📊 Ablação de Modelos", 
     "🌌 Astrofísica (Ajuste SPARC)",
+    "📜 Laudo & Rigor Científico",
     "⚛️ Protótipo Quântico", 
     "📖 Fundamentação Teórica"
 ])
@@ -578,7 +579,24 @@ with tab_astro:
         st.markdown("---")
         
         # Sliders do modelo Orange - DMS
-        gamma_fit = st.slider("Constante de Acoplamento (γ)", 0.0, 10.0, 1.5, 0.1)
+        st.markdown("**Ajuste de Acoplamento (γ) para cada Galáxia:**")
+        gamma_ngc3198 = st.slider("γ - NGC 3198 (Benchmark 1)", 0.0, 10.0, 1.5, 0.1, key="g_3198")
+        gamma_ngc2403 = st.slider("γ - NGC 2403 (Benchmark 2)", 0.0, 10.0, 1.3, 0.1, key="g_2403")
+        gamma_ugc128 = st.slider("γ - UGC 128 (Benchmark LSB)", 0.0, 10.0, 4.8, 0.1, key="g_128")
+        
+        # Guarda no session state para o laudo
+        st.session_state.gamma_ngc3198 = gamma_ngc3198
+        st.session_state.gamma_ngc2403 = gamma_ngc2403
+        st.session_state.gamma_ugc128 = gamma_ugc128
+        
+        # Seleciona o gamma ativo baseado na galáxia selecionada
+        if gal_sel == "NGC 3198":
+            gamma_fit = gamma_ngc3198
+        elif gal_sel == "NGC 2403":
+            gamma_fit = gamma_ngc2403
+        else:
+            gamma_fit = gamma_ugc128
+            
         r_scale_fit = st.slider("Raio de Escala da Malha (Rs) [kpc]", 1.0, 30.0, 8.0, 0.5)
         beta_fit = st.slider("Exponente de Decaimento (β)", 0.5, 3.0, 1.0, 0.1)
         
