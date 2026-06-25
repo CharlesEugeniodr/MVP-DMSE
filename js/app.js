@@ -24,7 +24,7 @@ import { DimensionAuditPanel } from './ui/dimension-audit.js';
 import { ComparativePanel } from './ui/comparative-panel.js';
 import { IngestionPanel } from './ui/ingestion-panel.js';
 import { ScientificReportPanel } from './ui/scientific-report.js';
-import { BenchmarkPanel } from './ui/benchmark-panel.js?v=3.2';
+import { BenchmarkPanel } from './ui/benchmark-panel.js?v=3.3';
 
 // ══════════════════════════════════════════
 // DMSEParams helper — creates a params object

@@ -58,18 +58,28 @@ class BuiltInRunner {
     const E0 = 1.0;
     const dims = TOTAL_DIMS;
     const r_rms_history = [];
+    const alpha = 0.5;  // diffusion
+    const eta = 0.05;   // damping
 
-    // Per-dimension field state
-    const E = Array.from({ length: dims }, () => {
+    // ── Initialization depends on model ──
+    // Orange: alternates ±E0 per channel (like the real engine)
+    // Others: random field near 0 with amplitude ~E0 (no preferred attractor)
+    const E = Array.from({ length: dims }, (_, d) => {
       const arr = new Float64Array(N);
-      for (let i = 0; i < N; i++) arr[i] = E0 + (Math.random() - 0.5) * 0.5;
+      if (modelKey === 'orange') {
+        const sign = (d % 2 === 0) ? 1.0 : -1.0;
+        for (let i = 0; i < N; i++) arr[i] = sign * E0 + (Math.random() - 0.5) * 0.1 * E0;
+      } else {
+        for (let i = 0; i < N; i++) arr[i] = (Math.random() - 0.5) * 2.0 * E0;
+      }
       return arr;
     });
     const V = Array.from({ length: dims }, () => new Float64Array(N));
 
-    // Model-specific parameters
-    const params = this._modelParams(modelKey);
+    // Orange-specific adaptive kappa
     let kappa = 1.0;
+    const kappa_gain = 0.1;
+    const r_rms_target = 0.02;
     let energy0 = null;
 
     for (let step = 0; step < this.steps; step++) {
@@ -79,33 +89,64 @@ class BuiltInRunner {
       for (let d = 0; d < dims; d++) {
         for (let i = 0; i < N; i++) {
           const e = E[d][i];
-          const r = (e - E0) / E0;
 
           // Laplacian (1D periodic)
           const left  = E[d][(i - 1 + N) % N];
           const right = E[d][(i + 1) % N];
           const lap = left + right - 2 * e;
 
-          // Force term varies by model
-          let force = params.alpha * lap - kappa * r * params.restoring;
+          let force = 0;
 
-          // Model-specific non-linearity
-          if (modelKey === 'phi4') {
-            force += -params.lambda * e * (e * e - E0 * E0);
+          // ════════════════════════════════════════════════════
+          // MODEL-SPECIFIC PHYSICS
+          // ════════════════════════════════════════════════════
+
+          if (modelKey === 'klein-gordon') {
+            // Klein-Gordon: ∂²φ/∂t² = ∇²φ - m²φ
+            // Mass term pulls to ZERO, not ±E0. No attractor.
+            const m2 = 0.5;
+            force = alpha * lap - m2 * e;
+
+          } else if (modelKey === 'phi4') {
+            // φ⁴ Theory: ∂²φ/∂t² = ∇²φ + m²φ - λφ³
+            // Double-well: V(φ) = -m²φ²/2 + λφ⁴/4
+            // Minima at φ = ±√(m²/λ) ≈ ±1.29 (NOT at ±E0)
+            const m2 = 0.5;   // negative mass² (tachyonic)
+            const lambda = 0.3;
+            force = alpha * lap + m2 * e - lambda * e * e * e;
+
           } else if (modelKey === 'string') {
-            force += params.tension * Math.sin(2 * Math.PI * e / E0);
+            // Worldsheet String: ∂²X/∂τ² = ∇²X
+            // Pure wave equation. NO mass. NO attractor. NO potential.
+            // Only diffusion + damping.
+            force = alpha * lap;
+
           } else if (modelKey === 'orange') {
-            // Cross-channel coupling
+            // Orange-DMSE: Full nonlinear attractor + coupling + adaptive κ
+            // r = E/E0 - sign(E)  →  attractor pulls to ±E0
+            const sign_e = e >= 0 ? 1.0 : -1.0;
+            const r = e / E0 - sign_e;
+            const omega = Math.max(Math.abs(e), 0.1 * E0);
+            const nl = -(kappa / E0) * omega * r;  // nonlinear attractor
+
+            // Cross-channel coupling (paired: d ↔ 29-d)
             const partner = dims - 1 - d;
-            const coupling = params.coupling * (E[partner][i] - e);
-            force += coupling;
+            const coupling = 0.1 * (E[partner][i] - e);
+
+            force = alpha * lap + nl + coupling;
           }
 
-          // Damped Verlet update
-          V[d][i] = V[d][i] * (1 - params.eta * dt) + force * dt;
+          // Damping (all models)
+          force -= eta * V[d][i];
+
+          // Verlet integration
+          V[d][i] += force * dt;
           E[d][i] += V[d][i] * dt;
 
-          r_sum += r * r;
+          // Residual relative to ±E0 (convergence metric)
+          const se = E[d][i] >= 0 ? 1.0 : -1.0;
+          const res = E[d][i] / E0 - se;
+          r_sum += res * res;
           r_count++;
         }
       }
@@ -113,10 +154,12 @@ class BuiltInRunner {
       const r_rms = Math.sqrt(r_sum / r_count);
       r_rms_history.push(r_rms);
 
-      // Adaptive kappa
-      const target = 0.01;
-      kappa *= r_rms > target ? 1.002 : 0.999;
-      kappa = Math.max(0.01, Math.min(100, kappa));
+      // Orange: adaptive kappa (other models don't have this)
+      if (modelKey === 'orange') {
+        const error = r_rms - r_rms_target;
+        kappa *= (1.0 + kappa_gain * error);
+        kappa = Math.max(1e-6, Math.min(1e3, kappa));
+      }
 
       // Record initial energy
       if (step === 0) {
@@ -129,13 +172,14 @@ class BuiltInRunner {
     const H_drift = energy0 > 0 ? Math.abs(energyFinal - energy0) / energy0 : 0;
     const finalRrms = r_rms_history[r_rms_history.length - 1];
 
-    // Per-dimension convergence check
+    // Per-dimension convergence: does |E| converge to ±E0?
     const dimConverged = [];
     const threshold = 0.05;
     for (let d = 0; d < dims; d++) {
       let dr = 0;
       for (let i = 0; i < N; i++) {
-        const r = (E[d][i] - E0) / E0;
+        const sign_e = E[d][i] >= 0 ? 1.0 : -1.0;
+        const r = E[d][i] / E0 - sign_e;
         dr += r * r;
       }
       dimConverged.push(Math.sqrt(dr / N) < threshold);
@@ -172,17 +216,6 @@ class BuiltInRunner {
       entropy,
       t_estab: t_estab >= 0 ? t_estab : this.steps,
     };
-  }
-
-  _modelParams(key) {
-    const base = { alpha: 0.5, eta: 0.05, restoring: 1.0 };
-    switch (key) {
-      case 'klein-gordon': return { ...base, restoring: 1.2 };
-      case 'phi4':         return { ...base, lambda: 0.3, restoring: 0.8 };
-      case 'string':       return { ...base, tension: 0.15, restoring: 0.9 };
-      case 'orange':       return { ...base, coupling: 0.08, restoring: 1.5 };
-      default:             return base;
-    }
   }
 
   _computeEnergy(E, V, dims, N) {
