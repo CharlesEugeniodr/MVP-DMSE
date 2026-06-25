@@ -147,6 +147,15 @@ Este software adota o compromisso irredutível da **transparência metodológica
 
 ---
 
-**Autor:** Charles de Paula Eugênio  
+## 👤 Autoria e Propriedade
+
+**Criador:** Charles de Paula Eugênio  
+**Propriedade Intelectual:** Sigma Sihf Soluções Analíticas S/A — CNPJ 01.851.824/0001-38  
+
 **Licença:** Open-Source Scientific  
-**Versão:** 2.0 — Junho 2026
+**Versão:** 2.0 — Junho 2026  
+
+---
+
+> © 2026 Charles de Paula Eugênio · Sigma Sihf Soluções Analíticas S/A · Todos os direitos reservados.
+

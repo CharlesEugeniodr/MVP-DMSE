@@ -1323,3 +1323,29 @@ select:focus, input[type="number"]:focus, input[type="text"]:focus {
     }
 }
 
+/* ─────────────────────────────────────────
+   Copyright Footer
+   ───────────────────────────────────────── */
+
+.app-footer {
+    position: fixed;
+    bottom: 0;
+    left: var(--sidebar-width);
+    right: 0;
+    padding: 8px 24px;
+    background: rgba(10, 14, 23, 0.9);
+    border-top: 1px solid var(--border-subtle);
+    text-align: center;
+    font-size: 0.7rem;
+    color: var(--text-tertiary);
+    font-family: var(--font-sans);
+    z-index: 100;
+    backdrop-filter: blur(8px);
+}
+
+@media (max-width: 768px) {
+    .app-footer {
+        left: 0;
+    }
+}
+

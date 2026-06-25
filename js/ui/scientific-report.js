@@ -114,6 +114,10 @@ export class ScientificReportPanel {
       </h1>
       <div class="cert-subtitle">Orange Dynamic Matter Simulation Engine — Audit Report</div>
       <div class="cert-date">${new Date().toISOString().slice(0, 19).replace('T', ' ')} UTC</div>
+      <div style="font-size: 0.8rem; color: var(--text-secondary); margin: 8px 0;">
+        <strong>Criador:</strong> Charles de Paula Eugênio<br>
+        <strong>Propriedade:</strong> Sigma Sihf Soluções Analíticas S/A — CNPJ 01.851.824/0001-38
+      </div>
       <div class="cert-verdict" style="color:${verdictColor};border-color:${verdictColor}">
         ${verdict === 'APPROVED' ? '✅' : verdict === 'APPROVED_WITH_CAVEATS' ? '⚠️' : '❌'}
         ${verdict.replace(/_/g, ' ')}
